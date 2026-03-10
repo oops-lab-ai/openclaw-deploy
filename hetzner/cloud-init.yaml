@@ -26,6 +26,18 @@ write_files:
       OPENCLAW_GATEWAY_BIND=loopback
       EOF
 
+      # Write minimal config so gateway doesn't refuse to start
+      cat > /opt/openclaw-data/openclaw.json << EOF
+      {
+        "gateway": {
+          "mode": "local",
+          "bind": "loopback",
+          "port": 18789,
+          "auth": { "mode": "token", "token": "${TOKEN}" }
+        }
+      }
+      EOF
+
       # Start OpenClaw
       cd /opt/openclaw && docker compose up -d
 
