@@ -1,10 +1,53 @@
 #cloud-config
 #
 # OpenClaw bootstrap for Hetzner VPS
-# Paste this into "User data" when creating your server.
+# Paste this into "User data" when creating your server (Ubuntu 22.04).
 #
-# After boot (~60s), SSH in and run:
-#   cd /opt/openclaw && OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest ./docker-setup.sh
+# After boot (~90s), SSH in and run:
+#   docker compose -f /opt/openclaw/docker-compose.yml --env-file /opt/openclaw/.env \
+#     run --rm openclaw-cli onboard --auth-choice openai-codex
+
+write_files:
+  - path: /opt/setup-openclaw.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      TOKEN=$(openssl rand -hex 32)
+      mkdir -p /opt/openclaw-data /opt/openclaw-workspace
+
+      # Write .env for docker-compose
+      cat > /opt/openclaw/.env << EOF
+      OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest
+      OPENCLAW_CONFIG_DIR=/opt/openclaw-data
+      OPENCLAW_WORKSPACE_DIR=/opt/openclaw-workspace
+      OPENCLAW_GATEWAY_TOKEN=${TOKEN}
+      OPENCLAW_GATEWAY_PORT=18789
+      OPENCLAW_GATEWAY_BIND=loopback
+      EOF
+
+      # Start OpenClaw
+      cd /opt/openclaw && docker compose up -d
+
+      # Save setup info
+      cat > /var/log/openclaw-setup.log << INFO
+      ========================================
+       OpenClaw is running!
+      ========================================
+       Gateway token: ${TOKEN}
+
+       To configure your AI provider, SSH in and run:
+         docker compose -f /opt/openclaw/docker-compose.yml --env-file /opt/openclaw/.env \
+           run --rm openclaw-cli onboard --auth-choice openai-codex
+
+       Web UI (SSH tunnel):
+         ssh -L 18789:localhost:18789 root@SERVER_IP
+         then open: http://localhost:18789
+      ========================================
+      INFO
+
+      cp /var/log/openclaw-setup.log /etc/motd
 
 package_update: true
 package_upgrade: true
@@ -15,24 +58,23 @@ packages:
   - ufw
 
 runcmd:
-  # Install Docker CE (official)
+  # Install Docker CE (official — not docker.io)
   - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
   - sh /tmp/get-docker.sh -q
   - systemctl enable docker
   - systemctl start docker
 
-  # Firewall — SSH only for now, open more as needed
+  # Firewall
   - ufw allow 22
   - ufw allow 80
   - ufw allow 443
   - ufw --force enable
 
-  # Pull OpenClaw repo
+  # Clone OpenClaw repo
   - git clone --depth=1 https://github.com/openclaw/openclaw /opt/openclaw
 
-  # Pre-pull the image so the wizard starts faster
+  # Pre-pull image
   - docker pull ghcr.io/openclaw/openclaw:latest
 
-  # Reminder on login
-  - |
-    printf '\n\e[1;32mOpenClaw is ready to configure!\e[0m\n\nRun:\n  cd /opt/openclaw\n  OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest ./docker-setup.sh\n\n' > /etc/motd
+  # Write .env, start container, save token
+  - bash /opt/setup-openclaw.sh
