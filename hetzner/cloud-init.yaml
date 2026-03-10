@@ -1,0 +1,45 @@
+#cloud-config
+
+# OpenClaw bootstrap for Hetzner VPS
+# Paste this into the "User data" field when creating your server.
+# After first boot (~60s), SSH in and run:
+#   cd /opt/openclaw && OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest ./docker-setup.sh
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - git
+  - ufw
+
+runcmd:
+  # Install Docker CE (official installer)
+  - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  - sh /tmp/get-docker.sh -q
+  - systemctl enable docker
+  - systemctl start docker
+
+  # Firewall — SSH, HTTP, HTTPS only
+  - ufw allow 22
+  - ufw allow 80
+  - ufw allow 443
+  - ufw --force enable
+
+  # Clone OpenClaw repo
+  - git clone --depth=1 https://github.com/openclaw/openclaw /opt/openclaw
+
+  # MOTD reminder
+  - |
+    cat > /etc/motd << 'EOF'
+
+    ╔══════════════════════════════════════════════════════╗
+    ║  OpenClaw is ready to configure!                     ║
+    ║                                                      ║
+    ║  Run:                                                ║
+    ║    cd /opt/openclaw                                  ║
+    ║    OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest \ ║
+    ║      ./docker-setup.sh                               ║
+    ╚══════════════════════════════════════════════════════╝
+
+    EOF
