@@ -4,8 +4,7 @@
 # Paste this into "User data" when creating your server (Ubuntu 22.04).
 #
 # After boot (~90s), SSH in and run:
-#   docker compose -f /opt/openclaw/docker-compose.yml --env-file /opt/openclaw/.env \
-#     run --rm openclaw-cli onboard --auth-choice openai-codex
+#   openclaw onboard --auth-choice openai-codex
 
 write_files:
   - path: /opt/setup-openclaw.sh
@@ -38,8 +37,7 @@ write_files:
        Gateway token: ${TOKEN}
 
        To configure your AI provider, SSH in and run:
-         docker compose -f /opt/openclaw/docker-compose.yml --env-file /opt/openclaw/.env \
-           run --rm openclaw-cli onboard --auth-choice openai-codex
+         openclaw onboard --auth-choice openai-codex
 
        Web UI (SSH tunnel):
          ssh -L 18789:localhost:18789 root@SERVER_IP
@@ -48,6 +46,15 @@ write_files:
       INFO
 
       cp /var/log/openclaw-setup.log /etc/motd
+
+      # Install openclaw wrapper so you can run: openclaw <command>
+      cat > /usr/local/bin/openclaw << 'WRAPPER'
+      #!/usr/bin/env bash
+      docker compose -f /opt/openclaw/docker-compose.yml \
+        --env-file /opt/openclaw/.env \
+        run --rm openclaw-cli "$@"
+      WRAPPER
+      chmod +x /usr/local/bin/openclaw
 
 package_update: true
 package_upgrade: true
