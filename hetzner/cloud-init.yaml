@@ -1,94 +1,10 @@
 #cloud-config
 #
-# OpenClaw — fully automated Hetzner setup
+# OpenClaw bootstrap for Hetzner VPS
+# Paste this into "User data" when creating your server.
 #
-# BEFORE pasting into Hetzner "User data":
-#   1. Replace YOUR_OPENAI_API_KEY with your actual key
-#   2. (Optional) Replace YOUR_DISCORD_BOT_TOKEN + YOUR_DISCORD_USER_ID if using Discord
-#
-# After boot (~60s), OpenClaw is running. No SSH needed.
-# To get your gateway token (for web UI access):
-#   ssh root@SERVER_IP cat /var/log/openclaw-setup.log
-
-write_files:
-  - path: /opt/setup-openclaw.sh
-    permissions: '0755'
-    content: |
-      #!/usr/bin/env bash
-      set -euo pipefail
-
-      # ─── EDIT THESE ──────────────────────────────────────────────
-      OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
-
-      # Optional — delete these lines if not using Discord
-      DISCORD_BOT_TOKEN="YOUR_DISCORD_BOT_TOKEN"
-      DISCORD_USER_ID="YOUR_DISCORD_USER_ID"
-      # ─────────────────────────────────────────────────────────────
-
-      TOKEN=$(openssl rand -hex 32)
-      mkdir -p /opt/openclaw-data /opt/openclaw-workspace
-
-      # Clone repo for docker-compose.yml
-      git clone --depth=1 https://github.com/openclaw/openclaw /opt/openclaw-repo -q
-
-      # Write .env
-      cat > /opt/openclaw-repo/.env << EOF
-      OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest
-      OPENCLAW_CONFIG_DIR=/opt/openclaw-data
-      OPENCLAW_WORKSPACE_DIR=/opt/openclaw-workspace
-      OPENCLAW_GATEWAY_TOKEN=${TOKEN}
-      OPENCLAW_GATEWAY_PORT=18789
-      OPENCLAW_GATEWAY_BIND=loopback
-      EOF
-
-      # Write config
-      cat > /opt/openclaw-data/openclaw.json << EOCFG
-      {
-        "gateway": {
-          "port": 18789,
-          "mode": "local",
-          "bind": "loopback",
-          "auth": { "mode": "token", "token": "${TOKEN}" }
-        },
-        "env": {
-          "vars": {
-            "OPENAI_API_KEY": "${OPENAI_API_KEY}"
-          }
-        },
-        "agents": {
-          "defaults": {
-            "model": { "primary": "openai/gpt-4o" }
-          }
-        },
-        "channels": {
-          "discord": {
-            "enabled": true,
-            "token": "${DISCORD_BOT_TOKEN}",
-            "allowFrom": ["${DISCORD_USER_ID}"],
-            "dm": { "enabled": true }
-          }
-        }
-      }
-      EOCFG
-
-      # Start OpenClaw
-      cd /opt/openclaw-repo
-      OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest docker compose up -d
-
-      # Save token for easy retrieval
-      {
-        echo "============================="
-        echo " OpenClaw setup complete!"
-        echo "============================="
-        echo " Gateway token: ${TOKEN}"
-        echo ""
-        echo " SSH tunnel for web UI:"
-        echo "   ssh -L 18789:localhost:18789 root@$(curl -s ifconfig.me 2>/dev/null || echo SERVER_IP)"
-        echo "   Then open: http://localhost:18789"
-        echo "============================="
-      } >> /var/log/openclaw-setup.log
-
-      echo "OpenClaw is running. See /var/log/openclaw-setup.log for access details."
+# After boot (~60s), SSH in and run:
+#   cd /opt/openclaw && OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest ./docker-setup.sh
 
 package_update: true
 package_upgrade: true
@@ -99,17 +15,24 @@ packages:
   - ufw
 
 runcmd:
-  # Docker CE (official)
+  # Install Docker CE (official)
   - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
   - sh /tmp/get-docker.sh -q
   - systemctl enable docker
   - systemctl start docker
 
-  # Firewall — SSH, HTTP, HTTPS only
+  # Firewall — SSH only for now, open more as needed
   - ufw allow 22
   - ufw allow 80
   - ufw allow 443
   - ufw --force enable
 
-  # Run OpenClaw setup
-  - bash /opt/setup-openclaw.sh
+  # Pull OpenClaw repo
+  - git clone --depth=1 https://github.com/openclaw/openclaw /opt/openclaw
+
+  # Pre-pull the image so the wizard starts faster
+  - docker pull ghcr.io/openclaw/openclaw:latest
+
+  # Reminder on login
+  - |
+    printf '\n\e[1;32mOpenClaw is ready to configure!\e[0m\n\nRun:\n  cd /opt/openclaw\n  OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest ./docker-setup.sh\n\n' > /etc/motd
