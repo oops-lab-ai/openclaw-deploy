@@ -25,7 +25,7 @@ write_files:
       OPENCLAW_WORKSPACE_DIR=/opt/openclaw-workspace
       OPENCLAW_GATEWAY_TOKEN=${TOKEN}
       OPENCLAW_GATEWAY_PORT=18789
-      OPENCLAW_GATEWAY_BIND=loopback
+      OPENCLAW_GATEWAY_BIND=lan
       EOF
 
       # Write minimal config so gateway doesn't refuse to start
