@@ -15,6 +15,8 @@ write_files:
 
       TOKEN=$(openssl rand -hex 32)
       mkdir -p /opt/openclaw-data /opt/openclaw-workspace
+      # Fix permissions — container runs as node (UID 1000)
+      chown -R 1000:1000 /opt/openclaw-data /opt/openclaw-workspace
 
       # Write .env for docker-compose
       cat > /opt/openclaw/.env << EOF
