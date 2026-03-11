@@ -28,14 +28,18 @@ write_files:
       OPENCLAW_GATEWAY_BIND=lan
       EOF
 
-      # Write minimal config so gateway doesn't refuse to start
+      # Write minimal config so gateway starts cleanly
       cat > /opt/openclaw-data/openclaw.json << EOF
       {
         "gateway": {
           "mode": "local",
-          "bind": "loopback",
+          "bind": "lan",
           "port": 18789,
-          "auth": { "mode": "token", "token": "${TOKEN}" }
+          "auth": { "mode": "token", "token": "${TOKEN}" },
+          "controlUi": {
+            "enabled": true,
+            "allowInsecureAuth": true
+          }
         }
       }
       EOF
