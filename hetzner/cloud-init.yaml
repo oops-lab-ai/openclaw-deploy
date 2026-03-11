@@ -44,8 +44,27 @@ write_files:
       }
       EOF
 
+      # Install gog CLI (Google Workspace — Gmail, Calendar, Drive)
+      curl -sL https://github.com/steipete/gogcli/releases/download/v0.12.0/gogcli_0.12.0_linux_amd64.tar.gz | tar -xz -C /usr/local/bin gog
+      chmod +x /usr/local/bin/gog
+      mkdir -p /root/.config/gog
+      chown -R 1000:1000 /root/.config/gog
+
+      # Write docker-compose.override.yml to mount gog into containers
+      cat > /opt/openclaw/docker-compose.override.yml << EOF
+      services:
+        openclaw-gateway:
+          volumes:
+            - /usr/local/bin/gog:/usr/local/bin/gog
+            - /root/.config/gog:/home/node/.config/gog
+        openclaw-cli:
+          volumes:
+            - /usr/local/bin/gog:/usr/local/bin/gog
+            - /root/.config/gog:/home/node/.config/gog
+      EOF
+
       # Start OpenClaw
-      cd /opt/openclaw && docker compose up -d
+      cd /opt/openclaw && docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 
       # Save setup info
       cat > /var/log/openclaw-setup.log << INFO
@@ -67,10 +86,14 @@ write_files:
 
       cp /var/log/openclaw-setup.log /etc/motd
 
-      # Install openclaw wrapper so you can run: openclaw <command>
+      # Install openclaw wrapper (includes override file if present)
       cat > /usr/local/bin/openclaw << 'WRAPPER'
       #!/usr/bin/env bash
-      docker compose -f /opt/openclaw/docker-compose.yml \
+      OVERRIDE_FLAG=""
+      if [ -f /opt/openclaw/docker-compose.override.yml ]; then
+        OVERRIDE_FLAG="-f /opt/openclaw/docker-compose.override.yml"
+      fi
+      docker compose -f /opt/openclaw/docker-compose.yml $OVERRIDE_FLAG \
         --env-file /opt/openclaw/.env \
         run --rm openclaw-cli "$@"
       WRAPPER
