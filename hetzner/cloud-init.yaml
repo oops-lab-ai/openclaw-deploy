@@ -50,17 +50,23 @@ write_files:
       mkdir -p /root/.config/gog
       chown -R 1000:1000 /root/.config/gog
 
-      # Write docker-compose.override.yml to mount gog into containers
+      # Install goplaces CLI (Google Places search)
+      curl -sL https://github.com/steipete/goplaces/releases/download/v0.3.0/goplaces_0.3.0_linux_amd64.tar.gz | tar -xz -C /usr/local/bin goplaces
+      chmod +x /usr/local/bin/goplaces
+
+      # Write docker-compose.override.yml to mount tools into containers
       cat > /opt/openclaw/docker-compose.override.yml << EOF
       services:
         openclaw-gateway:
           volumes:
             - /usr/local/bin/gog:/usr/local/bin/gog
             - /root/.config/gog:/home/node/.config/gog
+            - /usr/local/bin/goplaces:/usr/local/bin/goplaces
         openclaw-cli:
           volumes:
             - /usr/local/bin/gog:/usr/local/bin/gog
             - /root/.config/gog:/home/node/.config/gog
+            - /usr/local/bin/goplaces:/usr/local/bin/goplaces
       EOF
 
       # Start OpenClaw
