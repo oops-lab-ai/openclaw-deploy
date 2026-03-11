@@ -53,9 +53,11 @@ write_files:
        To configure your AI provider, SSH in and run:
          openclaw onboard --auth-choice openai-codex
 
-       Web UI (SSH tunnel):
-         ssh -L 18789:localhost:18789 root@SERVER_IP
-         then open: http://localhost:18789
+       Web UI (open this in your browser after SSH tunnel):
+         http://localhost:18789?token=${TOKEN}
+
+       SSH tunnel command (run on your local machine):
+         ssh -L 18789:localhost:18789 root@$(curl -s ifconfig.me 2>/dev/null || echo YOUR_SERVER_IP)
       ========================================
       INFO
 
